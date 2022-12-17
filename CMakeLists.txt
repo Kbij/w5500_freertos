@@ -56,7 +56,6 @@ if(NOT DEFINED PORT_DIR)
 endif()
 
 
-
 # Add libraries in subdirectories
 add_subdirectory(${CMAKE_SOURCE_DIR}/libraries)
 #add_subdirectory(${FREERTOS_DIR})
@@ -70,3 +69,25 @@ add_compile_options(
         -Wno-unused-function # we have some for the docs that aren't called
         -Wno-maybe-uninitialized
         )
+
+add_executable(${PROJECT_NAME} ${CMAKE_SOURCE_DIR}/src/main.c)
+# target_include_directories(${PROJECT_NAME} PRIVATE
+#     ${CMAKE_CURRENT_LIST_DIR}
+# )
+
+pico_add_extra_outputs(${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        pico_stdlib
+        hardware_spi
+        hardware_dma
+        FREERTOS_FILES
+        ETHERNET_FILES
+        IOLIBRARY_FILES
+        DHCP_FILES
+        DNS_FILES
+        TIMER_FILES
+        )
+
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
