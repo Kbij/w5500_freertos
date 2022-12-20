@@ -23,8 +23,10 @@
 #include "w5x00_spi.h"
 
 #include "dhcp.h"
-#include "dns.h"
-
+//#include "dns.h"
+#include "socket.h"
+#include "main.h"
+#include "server.h"
 #include "timer.h"
 
 /**
@@ -47,7 +49,7 @@
 
 /* Socket */
 #define SOCKET_DHCP 0
-#define SOCKET_DNS 3
+//#define SOCKET_DNS 3
 
 /* Retry count */
 #define DHCP_RETRY_COUNT 5
@@ -75,12 +77,6 @@ static uint8_t g_ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {
 /* DHCP */
 static uint8_t g_dhcp_get_ip_flag = 0;
 
-/* DNS */
-static uint8_t g_dns_target_domain[] = "www.wiznet.io";
-static uint8_t g_dns_target_ip[4] = {
-    0,
-};
-static uint8_t g_dns_get_ip_flag = 0;
 
 /* Semaphore */
 static xSemaphoreHandle dns_sem = NULL;
@@ -155,7 +151,7 @@ void dhcp_task(void *argument)
     printf("DHCP task ....\n");
     int retval = 0;
     uint8_t link;
-    uint16_t len = 0;
+    //uint16_t len = 0;
     uint32_t dhcp_retry = 0;
 
     if (g_net_info.dhcp == NETINFO_DHCP) // DHCP
@@ -214,7 +210,7 @@ void dhcp_task(void *argument)
 
                 g_dhcp_get_ip_flag = 1;
 
-                xSemaphoreGive(dns_sem);
+             //   xSemaphoreGive(dns_sem);
             }
         }
         else if (retval == DHCP_FAILED)
@@ -244,50 +240,93 @@ void dhcp_task(void *argument)
     }
 }
 
+static uint8_t g_server_buf[ETHERNET_BUF_MAX_SIZE] = {
+    0,
+};
+
 void dns_task(void *argument)
 {
-    uint8_t dns_retry;
+    long ret = 0;
+    uint16_t size = 0;
+    //uint8_t[100] recvBuf;
+    printf(" TCP server waiting for Semaphore...\n");
+  //  xSemaphoreTake(dns_sem, portMAX_DELAY);
+    socket(SERVER_SOCK_1, Sn_MR_TCP, LISTENING_PORT, 0x0);
 
     while (1)
     {
-        printf(" DNS waiting for Semaphore...\n");
-        xSemaphoreTake(dns_sem, portMAX_DELAY);
-        DNS_init(SOCKET_DNS, g_ethernet_buf);
 
-        dns_retry = 0;
-
-        while (1)
+        switch(getSn_SR(SERVER_SOCK_1))
         {
-            if (DNS_run(g_net_info.dns, g_dns_target_domain, g_dns_target_ip) > 0)
-            {
-                printf(" DNS success\n");
-                printf(" Target domain : %s\n", g_dns_target_domain);
-                printf(" IP of target domain : %d.%d.%d.%d\n", g_dns_target_ip[0], g_dns_target_ip[1], g_dns_target_ip[2], g_dns_target_ip[3]);
-
-                break;
-            }
-            else
-            {
-                dns_retry++;
-
-                if (dns_retry <= DNS_RETRY_COUNT)
+            case SOCK_ESTABLISHED :
                 {
-                    printf(" DNS timeout occurred and retry %d\n", dns_retry);
-                }
-            }
+                   // printf("SOCK_ESTABLISHED\n");
+                    // char* welcomeString = "Welcome\n";
+                    // ret = send(SERVER_SOCK_1, (uint8_t *)welcomeString, strlen((const char *)welcomeString));
 
-            if (dns_retry > DNS_RETRY_COUNT)
-            {
-                printf(" DNS failed\n");
+                    // if(ret < 0)
+                    // {
+                    //     close(SERVER_SOCK_1);
+                    //     return;//ret;
+                    // }
+                }
+
+                if((size = getSn_RX_RSR(SERVER_SOCK_1)) > 0) // Don't need to check SOCKERR_BUSY because it doesn't not occur.
+                {
+
+                    memset(g_server_buf, 0, ETHERNET_BUF_MAX_SIZE);
+
+                    ret = recv(SERVER_SOCK_1, g_server_buf, size);
+                    //printf("size: %d, ret: %d", size, ret);
+                    g_server_buf[ret] = '\0';
+                    if(ret != size)
+                    {
+                        if(ret==SOCK_BUSY) return;// 0;
+                        if(ret < 0)
+                        {
+                            close(SERVER_SOCK_1);
+                            return;// ret;
+                        }
+                    }
+                    else
+                    {
+                        printf("%s", g_server_buf);
+                    }
+                }
+                break;
+
+            case SOCK_CLOSE_WAIT :
+                printf("SOCK_CLOSE_WAIT\n");
+                if((ret=disconnect(SERVER_SOCK_1)) != SOCK_OK) return;// ret;
+                break;
+
+            case SOCK_CLOSED :
+                printf("SOCK_CLOSED\n");
+                if((ret=socket(SERVER_SOCK_1, Sn_MR_TCP, LISTENING_PORT, 0x0)) != SERVER_SOCK_1)
+                {
+                    close(SERVER_SOCK_1);
+                    return;// ret;
+                }
+                break;
+
+            case SOCK_INIT :
+                printf("SOCK_INIT\n");
+                if( (ret = listen(SERVER_SOCK_1)) != SOCK_OK)
+                {
+                    return;// ret;
+                }
+                printf("%d:Listen ok\r\n",SERVER_SOCK_1);
 
                 break;
-            }
 
-            vTaskDelay(10);
+            default :
+                break;
         }
+
+
     }
 
-    printf(" DNS task exit...\n");
+    printf(" Tcp Server task exit...\n");
 }
 
 /* Clock */
@@ -355,6 +394,6 @@ static void repeating_timer_callback(void)
         g_msec_cnt = 0;
 
         DHCP_time_handler();
-        DNS_time_handler();
+    //    DNS_time_handler();
     }
 }
