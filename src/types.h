@@ -8,6 +8,7 @@
 #define MAX_QUEUE_LENGTH     10
 #define BUFFER_SIZE          128
 
+#define NO_MESSAGE           0
 #define MSG_GET_STATUS       1
 #define MSG_CURRENT_SPEEED   2
 #define MSG_SET_SPEED        3

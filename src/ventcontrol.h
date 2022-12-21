@@ -1,0 +1,6 @@
+#ifndef C8EF045B_AAF1_4CEF_ACE5_68E90696899F
+#define C8EF045B_AAF1_4CEF_ACE5_68E90696899F
+
+void ventcontrol_task(void *params);
+
+#endif /* C8EF045B_AAF1_4CEF_ACE5_68E90696899F */

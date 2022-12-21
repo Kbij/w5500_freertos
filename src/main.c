@@ -26,6 +26,7 @@
 #include "dhcp.h"
 #include "main.h"
 #include "server.h"
+#include "ventcontrol.h"
 #include "types.h"
 #include "timer.h"
 
@@ -131,6 +132,7 @@ int main()
     printf("Creating task ....\n");
     xTaskCreate(dhcp_task, "DHCP_Task", DHCP_TASK_STACK_SIZE, &server_data, DHCP_TASK_PRIORITY, NULL);
     xTaskCreate(server_task, "Server_TASK", SERVER_TASK_STACK_SIZE, &server_data, SERVER_TASK_PRIORITY, NULL);
+    xTaskCreate(ventcontrol_task, "Ventcontrol_TASK", SERVER_TASK_STACK_SIZE, &server_data, SERVER_TASK_PRIORITY, NULL);
 
     vTaskStartScheduler();
 
