@@ -16,6 +16,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
+#include "queue.h"
 
 #include "port_common.h"
 
@@ -23,10 +24,9 @@
 #include "w5x00_spi.h"
 
 #include "dhcp.h"
-//#include "dns.h"
-#include "socket.h"
 #include "main.h"
 #include "server.h"
+#include "types.h"
 #include "timer.h"
 
 /**
@@ -38,8 +38,8 @@
 #define DHCP_TASK_STACK_SIZE 2048
 #define DHCP_TASK_PRIORITY 8
 
-#define DNS_TASK_STACK_SIZE 512
-#define DNS_TASK_PRIORITY 10
+#define SERVER_TASK_STACK_SIZE 512
+#define SERVER_TASK_PRIORITY 10
 
 /* Clock */
 #define PLL_SYS_KHZ (133 * 1000)
@@ -53,7 +53,6 @@
 
 /* Retry count */
 #define DHCP_RETRY_COUNT 5
-#define DNS_RETRY_COUNT 5
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -77,9 +76,8 @@ static uint8_t g_ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {
 /* DHCP */
 static uint8_t g_dhcp_get_ip_flag = 0;
 
-
-/* Semaphore */
-static xSemaphoreHandle dns_sem = NULL;
+/* Server data */
+static server_data_t server_data;
 
 /* Timer  */
 static volatile uint32_t g_msec_cnt = 0;
@@ -116,7 +114,7 @@ int main()
 
     stdio_init_all();
 
-    printf("Started ....\n");
+    printf("\nStarted ....\n");
     wizchip_spi_initialize();
     wizchip_cris_initialize();
 
@@ -125,12 +123,14 @@ int main()
     wizchip_check();
 
     wizchip_1ms_timer_initialize(repeating_timer_callback);
+    server_data.ip_assigned_sem = xSemaphoreCreateCounting((unsigned portBASE_TYPE)0x7fffffff, (unsigned portBASE_TYPE)0);
+    server_data.receive_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(message_t));
+    server_data.send_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(message_t));
+    server_data.blink_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(int));
 
     printf("Creating task ....\n");
-    xTaskCreate(dhcp_task, "DHCP_Task", DHCP_TASK_STACK_SIZE, NULL, DHCP_TASK_PRIORITY, NULL);
-    xTaskCreate(dns_task, "DNS_Task", DNS_TASK_STACK_SIZE, NULL, DNS_TASK_PRIORITY, NULL);
-
-    dns_sem = xSemaphoreCreateCounting((unsigned portBASE_TYPE)0x7fffffff, (unsigned portBASE_TYPE)0);
+    xTaskCreate(dhcp_task, "DHCP_Task", DHCP_TASK_STACK_SIZE, &server_data, DHCP_TASK_PRIORITY, NULL);
+    xTaskCreate(server_task, "Server_TASK", SERVER_TASK_STACK_SIZE, &server_data, SERVER_TASK_PRIORITY, NULL);
 
     vTaskStartScheduler();
 
@@ -146,8 +146,9 @@ int main()
  * ----------------------------------------------------------------------------------------------------
  */
 /* Task */
-void dhcp_task(void *argument)
+void dhcp_task(void *params)
 {
+    server_data_t* server_data = (server_data_t*) params;
     printf("DHCP task ....\n");
     int retval = 0;
     uint8_t link;
@@ -210,7 +211,7 @@ void dhcp_task(void *argument)
 
                 g_dhcp_get_ip_flag = 1;
 
-             //   xSemaphoreGive(dns_sem);
+                xSemaphoreGive(server_data->ip_assigned_sem);
             }
         }
         else if (retval == DHCP_FAILED)
@@ -238,95 +239,6 @@ void dhcp_task(void *argument)
 
         vTaskDelay(10);
     }
-}
-
-static uint8_t g_server_buf[ETHERNET_BUF_MAX_SIZE] = {
-    0,
-};
-
-void dns_task(void *argument)
-{
-    long ret = 0;
-    uint16_t size = 0;
-    //uint8_t[100] recvBuf;
-    printf(" TCP server waiting for Semaphore...\n");
-  //  xSemaphoreTake(dns_sem, portMAX_DELAY);
-    socket(SERVER_SOCK_1, Sn_MR_TCP, LISTENING_PORT, 0x0);
-
-    while (1)
-    {
-
-        switch(getSn_SR(SERVER_SOCK_1))
-        {
-            case SOCK_ESTABLISHED :
-                {
-                   // printf("SOCK_ESTABLISHED\n");
-                    // char* welcomeString = "Welcome\n";
-                    // ret = send(SERVER_SOCK_1, (uint8_t *)welcomeString, strlen((const char *)welcomeString));
-
-                    // if(ret < 0)
-                    // {
-                    //     close(SERVER_SOCK_1);
-                    //     return;//ret;
-                    // }
-                }
-
-                if((size = getSn_RX_RSR(SERVER_SOCK_1)) > 0) // Don't need to check SOCKERR_BUSY because it doesn't not occur.
-                {
-
-                    memset(g_server_buf, 0, ETHERNET_BUF_MAX_SIZE);
-
-                    ret = recv(SERVER_SOCK_1, g_server_buf, size);
-                    //printf("size: %d, ret: %d", size, ret);
-                    g_server_buf[ret] = '\0';
-                    if(ret != size)
-                    {
-                        if(ret==SOCK_BUSY) return;// 0;
-                        if(ret < 0)
-                        {
-                            close(SERVER_SOCK_1);
-                            return;// ret;
-                        }
-                    }
-                    else
-                    {
-                        printf("%s", g_server_buf);
-                    }
-                }
-                break;
-
-            case SOCK_CLOSE_WAIT :
-                printf("SOCK_CLOSE_WAIT\n");
-                if((ret=disconnect(SERVER_SOCK_1)) != SOCK_OK) return;// ret;
-                break;
-
-            case SOCK_CLOSED :
-                printf("SOCK_CLOSED\n");
-                if((ret=socket(SERVER_SOCK_1, Sn_MR_TCP, LISTENING_PORT, 0x0)) != SERVER_SOCK_1)
-                {
-                    close(SERVER_SOCK_1);
-                    return;// ret;
-                }
-                break;
-
-            case SOCK_INIT :
-                printf("SOCK_INIT\n");
-                if( (ret = listen(SERVER_SOCK_1)) != SOCK_OK)
-                {
-                    return;// ret;
-                }
-                printf("%d:Listen ok\r\n",SERVER_SOCK_1);
-
-                break;
-
-            default :
-                break;
-        }
-
-
-    }
-
-    printf(" Tcp Server task exit...\n");
 }
 
 /* Clock */
@@ -394,6 +306,5 @@ static void repeating_timer_callback(void)
         g_msec_cnt = 0;
 
         DHCP_time_handler();
-    //    DNS_time_handler();
     }
 }

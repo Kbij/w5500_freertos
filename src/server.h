@@ -1,0 +1,10 @@
+#ifndef B05D9526_ED76_4381_A517_160F0993D8C9
+#define B05D9526_ED76_4381_A517_160F0993D8C9
+
+#define LISTENING_PORT  5678
+#define BASE_PORT_ID    0
+
+
+void server_task(void* argument);
+
+#endif /* B05D9526_ED76_4381_A517_160F0993D8C9 */
