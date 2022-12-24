@@ -3,7 +3,7 @@
 
 #define LISTENING_PORT          1234
 #define LISTENING_SOCKET_COUNT  4
-#define BASE_PORT_ID            1
+#define BASE_PORT_ID            2
 #define KEEP_ALIVE_SECONDS      10
 #define TIMEOUT_SECONDS         30
 

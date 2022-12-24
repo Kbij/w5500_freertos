@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "server.h"
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
@@ -25,7 +26,6 @@
 
 #include "dhcp.h"
 #include "main.h"
-#include "server.h"
 #include "ventcontrol.h"
 #include "types.h"
 #include "timer.h"
@@ -40,7 +40,7 @@
 #define DHCP_TASK_PRIORITY 8
 
 #define SERVER_TASK_STACK_SIZE 512
-#define SERVER_TASK_PRIORITY 10
+#define SERVER_TASK_PRIORITY 4
 
 /* Clock */
 #define PLL_SYS_KHZ (133 * 1000)
@@ -50,7 +50,6 @@
 
 /* Socket */
 #define SOCKET_DHCP 0
-//#define SOCKET_DNS 3
 
 /* Retry count */
 #define DHCP_RETRY_COUNT 5
@@ -125,6 +124,7 @@ int main()
 
     wizchip_1ms_timer_initialize(repeating_timer_callback);
     server_data.ip_assigned_sem = xSemaphoreCreateCounting((unsigned portBASE_TYPE)0x7fffffff, (unsigned portBASE_TYPE)0);
+    server_data.server_run = false;
     server_data.receive_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(message_t));
     server_data.send_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(message_t));
     server_data.blink_queue = xQueueCreate(MAX_QUEUE_LENGTH, sizeof(int));
@@ -181,6 +181,7 @@ void dhcp_task(void *params)
         if (link == PHY_LINK_OFF)
         {
             printf("PHY_LINK_OFF\n");
+            server_data->server_run = false;
 
             DHCP_stop();
 
@@ -213,6 +214,7 @@ void dhcp_task(void *params)
 
                 g_dhcp_get_ip_flag = 1;
 
+                server_data->server_run = true;
                 xSemaphoreGive(server_data->ip_assigned_sem);
             }
         }
