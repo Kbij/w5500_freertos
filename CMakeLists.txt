@@ -56,6 +56,9 @@ if(NOT DEFINED PORT_DIR)
 endif()
 
 
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/dhcp_fix/dhcp.c DESTINATION ${WIZNET_DIR}/Internet/DHCP)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/dhcp_fix/dhcp.h DESTINATION ${WIZNET_DIR}/Internet/DHCP)
+
 # Add libraries in subdirectories
 add_subdirectory(${CMAKE_SOURCE_DIR}/libraries)
 #add_subdirectory(${FREERTOS_DIR})

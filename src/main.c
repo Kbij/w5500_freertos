@@ -114,13 +114,14 @@ int main()
 
     stdio_init_all();
 
-    printf("\nStarted ....\n");
+    printf("\nStarted, waiting for phy ....\n");
     wizchip_spi_initialize();
     wizchip_cris_initialize();
 
     wizchip_reset();
     wizchip_initialize();
     wizchip_check();
+    setSHAR(g_net_info.mac);
 
     wizchip_1ms_timer_initialize(repeating_timer_callback);
     server_data.ip_assigned_sem = xSemaphoreCreateCounting((unsigned portBASE_TYPE)0x7fffffff, (unsigned portBASE_TYPE)0);
