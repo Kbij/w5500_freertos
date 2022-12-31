@@ -82,6 +82,7 @@ pico_add_extra_outputs(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         pico_stdlib
+        pico_unique_id
         hardware_spi
         hardware_dma
         FREERTOS_FILES

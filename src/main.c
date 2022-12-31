@@ -11,8 +11,9 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include "pico/stdlib.h"
 #include <string.h>
-
+#include "pico/unique_id.h"
 #include "server.h"
 #include <FreeRTOS.h>
 #include <task.h>
@@ -62,13 +63,14 @@
 /* Network */
 static wiz_NetInfo g_net_info =
     {
-        .mac = {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56}, // MAC address
+        .mac = {0x12, 0x00, 0x00, 0x00, 0x00, 0x00}, // MAC address; 0x12 = free range mac
         .ip = {192, 168, 11, 2},                     // IP address
         .sn = {255, 255, 255, 0},                    // Subnet Mask
         .gw = {192, 168, 11, 1},                     // Gateway
         .dns = {8, 8, 8, 8},                         // DNS server
         .dhcp = NETINFO_DHCP                         // DHCP enable/disable
 };
+
 static uint8_t g_ethernet_buf[ETHERNET_BUF_MAX_SIZE] = {
     0,
 };
@@ -114,6 +116,20 @@ int main()
 
     stdio_init_all();
 
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    printf("board_id: ");
+    for(int i= 0; i<PICO_UNIQUE_BOARD_ID_SIZE_BYTES; i++)
+    {
+        printf("%X", board_id.id[i]);
+    }
+    for (int i = 1; i < 5; i++)
+    {
+        g_net_info.mac[i] = board_id.id[i - 1];
+    }
+
+
+    //g_net_info.mac
     printf("\nStarted, waiting for phy ....\n");
     wizchip_spi_initialize();
     wizchip_cris_initialize();
