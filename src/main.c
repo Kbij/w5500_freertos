@@ -40,7 +40,7 @@
 #define DHCP_TASK_STACK_SIZE 2048
 #define DHCP_TASK_PRIORITY 8
 
-#define SERVER_TASK_STACK_SIZE 512
+#define SERVER_TASK_STACK_SIZE 2048
 #define SERVER_TASK_PRIORITY 4
 
 /* Clock */
@@ -128,8 +128,6 @@ int main()
         g_net_info.mac[i] = board_id.id[i - 1];
     }
 
-
-    //g_net_info.mac
     printf("\nStarted, waiting for phy ....\n");
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -138,6 +136,7 @@ int main()
     wizchip_initialize();
     wizchip_check();
     setSHAR(g_net_info.mac);
+    dhcpHostName("ventcontrol");
 
     wizchip_1ms_timer_initialize(repeating_timer_callback);
     server_data.ip_assigned_sem = xSemaphoreCreateCounting((unsigned portBASE_TYPE)0x7fffffff, (unsigned portBASE_TYPE)0);
